@@ -27,24 +27,30 @@ print([123])
 ```
 
 ```Rscript
-  123
-c(123)
+# 123
+c(123, 456)
 ```
 
 **Basic Container Types**
 
 ```Rscript
-list(123, 'hello')     # list      ; heterogeneous (can contain differently typed data)
-list(a=123, b='hello') # named list; heterogeneous (can contain differently typed data)
-c(123)                 # vector    ; homogenous (must contain singly typed data)
+# list(123L, 'hello')     # list      ; heterogeneous (can contain differently typed data)
+x <- list(a=123, b='hello') # named list; heterogeneous (can contain differently typed data)
+x[['a']]
+# c(123L)                 # vector    ; homogenous (must contain singly typed data)
 ```
 
 ```python
 from array import array
 
+# x = [123, 'hello']           # list; heterogeneous (can contain differently typed data) 
+# print(x[0])
+
+# x = {'a': 123, 'b': 'hello', 0: 'world'} # dict; heterogeneous (can contain differently typed data) 
+# print(x['a'])
+# print(x)
+
 print(
-    [123, 'hello'],           # list; heterogeneous (can contain differently typed data) 
-    {'a': 123, 'b': 'hello'}, # dict; heterogeneous (can contain differently typed data) 
     array('i', [123, 456]),   # 1D-array; homogeneous (singly typed data; no one usually uses this in Python)
     sep='\n',
 )
@@ -55,6 +61,12 @@ print(
 DataFrames across many languages are implemented as an ordered
 *heterogeneous* collection of 1d *homogeneous* column-oriented vectors/arrays.
 
+as a list of vectors.
+
+```Rscript
+list(a=c(123, 456))
+```
+
 ```Rscript
 data <- data.frame(
     a=c(123, 456),
@@ -62,9 +74,19 @@ data <- data.frame(
     c=c(TRUE, FALSE)
 )
 
-data
+data_list <- list(
+    a=c(123, 456),
+    b=c('hello', 'world'),
+    c=c(TRUE, FALSE)
+)
+
 sapply(data, typeof)
+lapply(data_list, typeof)
 ```
+
+1. pandas (OG) originated in 2010
+2. Polars (2nd generation of DataFrames in Python)
+3. DuckDB (2nd generation DataFrame)
 
 ```python
 from polars import DataFrame
@@ -75,11 +97,9 @@ df = DataFrame({
     'c': [True, False],
 })
 
-print(
-    # df,
-    df.schema,
-    sep='\n',
-)
+# print(df)
+print(df.glimpse())
+print(glimpse(df))
 ```
 
 Columns themselves are 1d & homogeneous for decreased *memory* usage and increased *speed*
@@ -98,8 +118,8 @@ values = [*repeat(1, 100_000)]
 series = Series(values)
 
 print(
-    f'{sum(getsizeof(x) for x in values) = : >10,}',
-    f'{series.estimated_size()           = : >10,}',
+    f'{sum(getsizeof(x) for x in values) = : >10,}', # Python list
+    f'{series.estimated_size()           = : >10,}', # Polars Series
     sep='\n',
 )
 ```
@@ -115,7 +135,6 @@ object.size(xs_lst)
 And *speed*
 
 ```python
-from sys import getsizeof
 from itertools import repeat
 from _utils import timed
 
@@ -155,10 +174,11 @@ df = DataFrame({
     'c': [True, False],
 })
 
+print(df)
 
 print(
-    df['a'],                    # select column 'a'
-    df['a'] ** 2,               # select column 'a' and square it
+    # df['a'],                    # select column 'a'
+    # df['a'] ** 2,               # select column 'a' and square it
     df['b'].str.to_uppercase(), # select column 'b' and uppercase all values
     sep='\n',
 )
@@ -173,9 +193,9 @@ data <- data.frame(
     c=c(TRUE, FALSE)
 )
 
-data$a          # select column a
-data[['a']]     # select column a via a string
-data$a ^ 2      # square column a
+# data$a          # select column a
+# data[['a']]     # select column a via a string
+# data$a ^ 2      # square column a
 toupper(data$b) # upper case column b
 ```
 
@@ -194,10 +214,8 @@ data$z <- data$a + (data$b * 2) + (data$c * 3) + (data$d * 4)
 data
 
 # Instead, we can use some of the *magic* of R
-# suppressPackageStartupMessages({
-#   library(dplyr)
-# })
-# data %>% mutate(z = a + (b*2) + (c*3) + (d*4))
+library(dplyr, warn.conflicts = FALSE)
+data %>% mutate(z = a + (b*2) + (c*3) + (d*4))
 ```
 
 Similarly in Python, we would…
@@ -214,8 +232,8 @@ df = DataFrame({
 
 print(
     df.with_columns(
-        z=df['a'] + (df['b'] * 2) + (df['c'] * 3) + (df['d'] * 4),
-        # z=col('a') + (col('b') * 2) + (col('c') * 3) + (col('d') * 4),
+        # z=df['a'] + (df['b'] * 2) + (df['c'] * 3) + (df['d'] * 4),
+        z=col('a') + (col('b') * 2) + (col('c') * 3) + (col('d') * 4),
     )
 )
 ```
@@ -229,7 +247,7 @@ As a feature of the language, R expressionss are lazily evaluated (read non-stan
 
 ```Rscript
 f <- function(expr) {
-    100
+    expr
 }
 
 f(x + y * 2) # no error!
@@ -250,7 +268,7 @@ This feature in R allows for the separation of an expression from its evaluation
 ```Rscript
 f <- function(expr) {
     e <- substitute(expr)
-    eval(e, list(x=10, y=20))
+    eval(e, list(x=100, y=20))
 }
 
 f(x + y * 2)
@@ -260,8 +278,10 @@ But is this feature always a good idea? It can make for some head scratching cod
 
 ```Rscript
 f <- function(x, y = x + 1) {
+    # x is 10
     x <- y * 2
-    y
+    # x is 22
+    y # 22 + 1
 }
 
 f(10)
@@ -274,16 +294,16 @@ invented an expression system of its own.
 from polars import col
 
 print(
-    col('a'),                    # column a
-    col('a') ** 2,               # column a squared
-    col('b').str.to_uppercase(), # column b as uppercased
+    # col('a'),                    # column a
+    # col('a') ** 2,               # column a squared
+    # col('b').str.to_uppercase(), # column b as uppercased
     sep='\n',
 )
 ```
 
 ## Expressions & DataFrames: a beautiful match
 
-In R (dplyr) we have a grammer that lets us effectively compose expressions to operate on
+In R (dplyr) we have a grammar that lets us effectively compose expressions to operate on
 data frames.
 
 The following was taken from https://dplyr.tidyverse.org/
@@ -294,9 +314,7 @@ The following was taken from https://dplyr.tidyverse.org/
 - `arrange()` changes the ordering of the rows.
 
 ```Rscript
-suppressPackageStartupMessages({
-  library(dplyr)
-})
+library(dplyr, warn.conflicts = FALSE)
 
 data <- data.frame(
     a=0:3,
@@ -337,11 +355,12 @@ df = DataFrame({
 })
 
 print(
+    # df.select(z=col('a') * 2),           # mutate(z = a * 2)
     # df.with_columns(z=col('a') * 2),           # mutate(z = a * 2)
-    # df.select(cs.numeric()),                   # select(a:c)
+    # df.select(cs.numeric() * 2),                   # select(where(is.numeric))
     # df.filter(col('a') >= 2),                  # filter(a >= 2)
     # df.select(col('a').mean()),                # summarise(mean(a), mean(b))
-    # df.group_by('group').agg(col('a').mean()), # group_by(group) %>% summarise(mean(a))
+    df.group_by('group').agg(col('a').mean()), # group_by(group) %>% summarise(mean(a))
     sep='\n',
 )
 ```
@@ -399,8 +418,8 @@ buffer = StringIO('''
 2020-01-09           84       211           True
 '''.lstrip())
 
-from pandas import read_csv as pd_read_csv
-from polars import col, from_pandas, Date, Int64
+from pandas import read_csv as pd_read_csv # its been around for a long time; it has a lot of conveniences
+from polars import col, from_pandas, Date, Int64, Int8
 
 df = (
     pd_read_csv(buffer, sep=r'\s{2,}', engine='python')
@@ -410,142 +429,66 @@ df = (
         col('date').str.strptime(Date, format='%Y-%m-%d')
     )
 )
-print(df)
+# print(df)
 
 # What is the weather on January 2nd?
-# from datetime import date
-# print(df.filter(col('date') == date(2020, 1, 2)))
+from datetime import date
+print(
+    # df.filter(col('temperature') == 77)
+    df.lazy().filter(col('date') == date(2020, 1, 2))
+)
 
 # How many days did it rain? How many days did it not rain?
-# print(df.select(col('precipitation').value_counts().struct.unnest()))
+# print(
+#     df.select(col('precipitation').value_counts().struct.unnest())
+# )
 
 # What days were hotter than the preceding recorded day?
-# from polars import duration
 # print(
-#     df.filter(col('temperature') > col('temperature').shift())
+#     df.select(
+#         (col('temperature') > col('temperature').shift()).value_counts()
+#     )
 # )
 
 # What was the hottest day when it rained?
 # print(
-#     df.filter(col('precipitation')).top_k(2, by='temperature')
+#     df.filter(col('precipitation'))
+#     # .sort('temperature')
+#     .top_k(3, by='temperature')
 # )
 
 # What were the longest and shortest streaks of rainy days in a row; when did they begin?
-# from polars import len
-# print(
-#     df.group_by(col('precipitation').rle_id())
+#from polars import len as pl_len
+#print(
+#     #df.with_columns(rle=col('precipitation').rle_id())
+#     df.group_by(['precipitation', col('precipitation').rle_id().alias('id')])
 #     .agg(
-#         start=col('date').min(),
-#         length=len(),
-#         rained=col('precipitation').first()
+#        start=col('date').min(),
+#        length=pl_len(),
 #     )
-#     .filter(col('rained'))
+#     .filter('precipitation')
 #     .drop('precipitation')
-# )
-```
-
-### Credit Card Transactions (data cleaning problem)
-
-```
-transactions/
-├── axpy
-│   ├── 2020-01-01.csv
-│   ├── 2020-01-02.csv
-│   ├── 2020-01-03.csv
-│   ├── 2020-01-04.csv
-│   ...
-├── credo.csv
-└── finix.csv
-```
-
-```python
-from pathlib import Path
-from polars import scan_csv
-
-transactions_dir = Path('data', 'transactions')
-
-for p in ['credo.csv', 'finix.csv', 'axpy/2020-01-01.csv'][1:2]:
-    print(p)
-    print(scan_csv(transactions_dir / p).head(2).collect())
-
-# date, merchant, category, transaction_date, type, amount
-# dt  , str     , cat     , dt              , enum, float
-```
-
-```python
-from polars import scan_csv, col, Enum, Date, Categorical, Int8, Float64
-
-SpendType = Enum(['purchase', 'refund'])
-
-## Axpy
-axpy_df = (
-    scan_csv('data/transactions/axpy/*.csv', include_file_paths='path')
-    .rename(str.lower)
-    .with_columns(
-        date=col('path').str.strptime(Date(), format='data/transactions/axpy/%Y-%m-%d.csv'),
-    )
-    .cast({'category': Categorical, 'type': SpendType})
-    .drop('path')
-)
-
-## Finix
-finix_df = (
-    scan_csv('data/transactions/finix.csv')
-    .rename({'store': 'merchant'})
-    .with_columns(
-        col('date').str.strptime(Date(), format='%m/%d/%Y'),
-        col('amount').abs(),
-        type=col('amount').lt(0).cast(Int8).cast(SpendType),
-    )
-    .cast({'category': Categorical})
-)
-
-
-
-## Credo
-credo_df = (
-    scan_csv('data/transactions/credo.csv')
-    .rename(str.lower)
-    .with_columns(
-        date=col('transaction_date').str.strptime(Date(), format='%Y-%m-%d'),
-    )
-    .unpivot(
-        on=['purchase', 'refund'],
-        index=['merchant', 'category', 'date'],
-        variable_name='type',
-        value_name='amount'
-    )
-    .filter(col('amount').is_not_null())
-    .cast({'type': SpendType, 'category': Categorical, 'amount': Float64})
-)
-
-from polars import concat, lit
-dfs = {
-    'axpy': axpy_df,
-    'finix': finix_df,
-    'credo': credo_df,
-}
-
-result = concat([df.with_columns(source=lit(name)) for name, df in dfs.items()], how='diagonal')
-result.sink_parquet('data/transactions/clean.parquet')
-
-print(result.head().collect())
-print('done!')
-```
-
-```python
-from polars import scan_parquet, col
-
-print(
-    scan_parquet('data/transactions/clean.parquet')
-    .group_by(['source', 'type']).agg(
-        col('amount').sum(),
-        start_date=col('date').min(),
-        end_date=col('date').max(),
-    )
-    .sort('source', 'type')
-    .collect()
-)
+#)
 ```
 
 ## Wrap Up
+
+R and Python adopt distinct philosophies but converge on a similar underlying
+concept for data structures: column-oriented, homogeneous vectors combined
+into a heterogeneous table. R’s data.frame and Python’s polars.DataFrame
+implement this model in ways that reflect their respective design priorities,
+with R emphasizing concise syntax and non-standard evaluation, and Python
+emphasizing explicit and composable expressions.
+
+Polars provides a declarative framework for data transformation that
+parallels R’s dplyr. Instead of performing in-place mutations, it builds
+expressions that describe transformations and evaluate within a defined
+context, whether over the entire DataFrame or within groups. This model
+enables efficient execution and a clear separation between definition and
+evaluation. Polars, can be evaluated in an entirely lazy fashion and has
+a powerful query optimizer to help further speed up your queries similar
+to dtplyr, dbplyr, etc.
+
+Both ecosystems ultimately achieve a comparable balance between
+expressiveness and precision, with Polars offering a structured and
+performant interpretation of the DataFrame paradigm in Python.
